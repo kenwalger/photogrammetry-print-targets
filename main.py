@@ -19,6 +19,7 @@ COLUMNS: int = 4                  # markers per row
 MARKERS_TOTAL: int = 12           # total markers to generate
 DPI: int = 300                    # print resolution (does not affect scale)
 PAGE_MARGIN_MM: float = 10.0      # white margin for printing
+MARKER_PADDING_MM: float = 5.0    # 5mm gap between markers
 
 # ==============================
 # CALIBRATION FEATURE
@@ -161,9 +162,10 @@ codes = get_ring_codes(BITS, MARKERS_TOTAL)
 rows = math.ceil(len(codes) / COLUMNS)
 
 MARKER_SIZE_MM = DOT_RADIUS_MM * 6
+MARKER_CELL_SIZE = MARKER_SIZE_MM + MARKER_PADDING_MM
 
-page_width = COLUMNS * MARKER_SIZE_MM + 2 * PAGE_MARGIN_MM
-page_height = rows * MARKER_SIZE_MM + 2 * PAGE_MARGIN_MM
+page_width = COLUMNS * MARKER_CELL_SIZE + 2 * PAGE_MARGIN_MM
+page_height = rows * MARKER_CELL_SIZE + 2 * PAGE_MARGIN_MM
 
 fig = plt.figure(
     figsize=(page_width / 25.4, page_height / 25.4),
@@ -180,9 +182,9 @@ for idx, code in enumerate(codes):
     col = idx % COLUMNS
     row = idx // COLUMNS
 
-    cx = PAGE_MARGIN_MM + col * MARKER_SIZE_MM + MARKER_SIZE_MM / 2
+    cx = PAGE_MARGIN_MM + col * MARKER_CELL_SIZE + MARKER_CELL_SIZE / 2
     cy = page_height - (
-        PAGE_MARGIN_MM + row * MARKER_SIZE_MM + MARKER_SIZE_MM / 2
+        PAGE_MARGIN_MM + row * MARKER_CELL_SIZE + MARKER_CELL_SIZE / 2
     )
 
     patches = get_coded_marker(cx, cy, DOT_RADIUS_MM, BITS, code)
