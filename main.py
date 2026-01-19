@@ -1,4 +1,5 @@
 import math
+import os
 from typing import List
 
 import matplotlib.pyplot as plt
@@ -217,3 +218,33 @@ plt.savefig(
     transparent=True
 )
 plt.close()
+
+
+# ==============================
+# Create directory if it doesn't exist
+# ==============================
+
+output_dir = "targets"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+# Inside your loop, save individual SVGs for the "Targets" folder
+for idx, code in enumerate(codes):
+    # (Existing coordinate logic...)
+
+    # Create a small temp figure for the individual SVG
+    target_fig = plt.figure(figsize=(MARKER_SIZE_MM / 25.4, MARKER_SIZE_MM / 25.4))
+    target_ax = target_fig.add_axes([0, 0, 1, 1])
+    target_ax.set_aspect("equal")
+    target_ax.axis("off")
+
+    # Add patches to the individual file
+    target_patches = get_coded_marker(0, 0, DOT_RADIUS_MM, BITS, code)
+    for p in target_patches:
+        target_ax.add_patch(p)
+
+    target_ax.set_xlim(-MARKER_SIZE_MM / 2, MARKER_SIZE_MM / 2)
+    target_ax.set_ylim(-MARKER_SIZE_MM / 2, MARKER_SIZE_MM / 2)
+
+    target_fig.savefig(f"{output_dir}/target_{idx + 1}.svg", transparent=True)
+    plt.close(target_fig)
