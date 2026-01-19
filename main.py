@@ -3,7 +3,7 @@ from typing import List
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.patches import Polygon, Circle
+from matplotlib.patches import Wedge, Circle
 
 # NOTE:
 # Print at 100% scale / Actual Size.
@@ -59,7 +59,7 @@ def get_coded_marker(
     dot_radius: float,
     bits: int,
     code: int
-) -> List[Polygon | Circle]:
+) -> List[Wedge | Circle]:
     """
     Create the geometric elements for a single coded photogrammetry marker.
 
@@ -79,7 +79,7 @@ def get_coded_marker(
     Returns:
         A list of Matplotlib patch objects representing the marker geometry.
     """
-    patches: List[Polygon | Circle] = []
+    patches: List[Wedge | Circle] = []
 
     # --- center dot ---
     patches.append(
@@ -94,36 +94,20 @@ def get_coded_marker(
     # --- coded ring ---
     ring_inner = dot_radius * 1.6
     ring_outer = dot_radius * 2.4
-    angle_step = 2 * math.pi / bits
+    angle_step_deg = 360.0 / bits
 
     for i in range(bits):
         if (code >> i) & 1:
-            theta1 = i * angle_step
-            theta2 = (i + 1) * angle_step
-
-            pts = [
-                (
-                    center_x + ring_inner * math.cos(theta1),
-                    center_y + ring_inner * math.sin(theta1),
-                ),
-                (
-                    center_x + ring_outer * math.cos(theta1),
-                    center_y + ring_outer * math.sin(theta1),
-                ),
-                (
-                    center_x + ring_outer * math.cos(theta2),
-                    center_y + ring_outer * math.sin(theta2),
-                ),
-                (
-                    center_x + ring_inner * math.cos(theta2),
-                    center_y + ring_inner * math.sin(theta2),
-                ),
-            ]
+            theta1 = i * angle_step_deg
+            theta2 = (i + 1) * angle_step_deg
 
             patches.append(
-                Polygon(
-                    pts,
-                    closed=True,
+                Wedge(
+                    (center_x, center_y),
+                    r=ring_outer,
+                    theta1=theta1,
+                    theta2=theta2,
+                    width=ring_outer - ring_inner,
                     facecolor="black",
                     edgecolor="none"
                 )

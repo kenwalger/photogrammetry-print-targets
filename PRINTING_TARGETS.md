@@ -90,6 +90,8 @@ This workflow meets professional documentation standards when paired with:
 - Consistent printing procedures
 - Logged verification results
 
+✔ Geometric Fidelity: Targets utilize true circular arcs (Wedge geometry). This ensures that as the turntable rotates, the target deforms into a mathematically predictable ellipse, allowing the software to maintain sub-pixel center-accuracy even at steep 45° or 60° gantry angles.
+
 ---
 
 ## Summary

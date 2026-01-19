@@ -10,12 +10,13 @@ photogrammetric capture workflows.
 
 ## Features
 
-- Binary coded photogrammetry markers
+- Mathematically precise 8-bit coded targets using circular arc (Wedge) geometry.
 - 6 mm solid center dots (design-space)
 - Explicit millimeter-based geometry
 - Sheet-level calibration reference (20.00 mm)
 - Print-verifiable output (PDF)
 - No surface contact or adhesive requirements
+- Sub-pixel centroid optimization for high-angle gantry capture.
 
 ---
 
