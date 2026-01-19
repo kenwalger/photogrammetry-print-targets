@@ -1,0 +1,233 @@
+import math
+from typing import List
+
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.patches import Polygon, Circle
+
+# NOTE:
+# Print at 100% scale / Actual Size.
+# Disable all driver scaling and borderless expansion.
+
+# ==============================
+# CONFIGURATION (ARCHIVAL SAFE)
+# ==============================
+
+DOT_RADIUS_MM: float = 3.0        # 6 mm diameter center dot
+BITS: int = 8                     # number of ring bits
+COLUMNS: int = 4                  # markers per row
+MARKERS_TOTAL: int = 12           # total markers to generate
+DPI: int = 300                    # print resolution (does not affect scale)
+PAGE_MARGIN_MM: float = 10.0      # white margin for printing
+
+# ==============================
+# CALIBRATION FEATURE
+# ==============================
+
+CAL_DOT_RADIUS_MM: float = 2.0
+CAL_DOT_SPACING_MM: float = 20.0
+CAL_LABEL: str = "20.00 mm calibration reference"
+
+# ==============================
+# CODE GENERATION (PLACEHOLDER)
+# ==============================
+
+def get_ring_codes(bits: int, n: int) -> List[int]:
+    """
+    Generate a deterministic list of binary marker codes.
+
+    This is a placeholder implementation intended to be replaced with
+    a MATLAB-equivalent ring-code generator if exact compatibility is required.
+
+    Args:
+        bits: Number of bits used in the coded ring.
+        n: Number of marker codes to generate.
+
+    Returns:
+        A list of integer codes suitable for binary ring encoding.
+    """
+    max_code = 2 ** bits
+    return list(range(1, min(n + 1, max_code)))
+
+# ==============================
+# MARKER GEOMETRY
+# ==============================
+
+def get_coded_marker(
+    center_x: float,
+    center_y: float,
+    dot_radius: float,
+    bits: int,
+    code: int
+) -> List[Polygon | Circle]:
+    """
+    Create the geometric elements for a single coded photogrammetry marker.
+
+    The marker consists of:
+    - A solid circular center dot
+    - A surrounding binary-coded ring
+
+    All dimensions are defined in millimeters.
+
+    Args:
+        center_x: X-coordinate of the marker center (mm).
+        center_y: Y-coordinate of the marker center (mm).
+        dot_radius: Radius of the solid center dot (mm).
+        bits: Number of binary segments in the coded ring.
+        code: Integer value encoding which ring segments are filled.
+
+    Returns:
+        A list of Matplotlib patch objects representing the marker geometry.
+    """
+    patches: List[Polygon | Circle] = []
+
+    # --- center dot ---
+    patches.append(
+        Circle(
+            (center_x, center_y),
+            radius=dot_radius,
+            facecolor="black",
+            edgecolor="none"
+        )
+    )
+
+    # --- coded ring ---
+    ring_inner = dot_radius * 1.6
+    ring_outer = dot_radius * 2.4
+    angle_step = 2 * math.pi / bits
+
+    for i in range(bits):
+        if (code >> i) & 1:
+            theta1 = i * angle_step
+            theta2 = (i + 1) * angle_step
+
+            pts = [
+                (
+                    center_x + ring_inner * math.cos(theta1),
+                    center_y + ring_inner * math.sin(theta1),
+                ),
+                (
+                    center_x + ring_outer * math.cos(theta1),
+                    center_y + ring_outer * math.sin(theta1),
+                ),
+                (
+                    center_x + ring_outer * math.cos(theta2),
+                    center_y + ring_outer * math.sin(theta2),
+                ),
+                (
+                    center_x + ring_inner * math.cos(theta2),
+                    center_y + ring_inner * math.sin(theta2),
+                ),
+            ]
+
+            patches.append(
+                Polygon(
+                    pts,
+                    closed=True,
+                    facecolor="black",
+                    edgecolor="none"
+                )
+            )
+
+    return patches
+
+def draw_calibration_feature(ax: Axes, origin_x: float, origin_y: float) -> None:
+    """
+    Draw a calibration reference consisting of two dots separated
+    by a known center-to-center distance.
+
+    This feature is intended for physical verification of print scale.
+
+    Args:
+        ax: Matplotlib Axes object to draw on.
+        origin_x: X-coordinate of the first calibration dot (mm).
+        origin_y: Y-coordinate of the first calibration dot (mm).
+    """
+    dot1 = Circle(
+        (origin_x, origin_y),
+        radius=CAL_DOT_RADIUS_MM,
+        facecolor="black",
+        edgecolor="none"
+    )
+
+    dot2 = Circle(
+        (origin_x + CAL_DOT_SPACING_MM, origin_y),
+        radius=CAL_DOT_RADIUS_MM,
+        facecolor="black",
+        edgecolor="none"
+    )
+
+    ax.add_patch(dot1)
+    ax.add_patch(dot2)
+
+    ax.text(
+        origin_x + CAL_DOT_SPACING_MM / 2,
+        origin_y - CAL_DOT_RADIUS_MM * 2.5,
+        CAL_LABEL,
+        fontsize=6,
+        ha="center",
+        va="top"
+    )
+
+# ==============================
+# LAYOUT & RENDERING
+# ==============================
+
+codes = get_ring_codes(BITS, MARKERS_TOTAL)
+rows = math.ceil(len(codes) / COLUMNS)
+
+MARKER_SIZE_MM = DOT_RADIUS_MM * 6
+
+page_width = COLUMNS * MARKER_SIZE_MM + 2 * PAGE_MARGIN_MM
+page_height = rows * MARKER_SIZE_MM + 2 * PAGE_MARGIN_MM
+
+fig = plt.figure(
+    figsize=(page_width / 25.4, page_height / 25.4),
+    dpi=DPI
+)
+
+ax = fig.add_axes([0, 0, 1, 1])
+ax.set_xlim(0, page_width)
+ax.set_ylim(0, page_height)
+ax.set_aspect("equal")
+ax.axis("off")
+
+for idx, code in enumerate(codes):
+    col = idx % COLUMNS
+    row = idx // COLUMNS
+
+    cx = PAGE_MARGIN_MM + col * MARKER_SIZE_MM + MARKER_SIZE_MM / 2
+    cy = page_height - (
+        PAGE_MARGIN_MM + row * MARKER_SIZE_MM + MARKER_SIZE_MM / 2
+    )
+
+    patches = get_coded_marker(cx, cy, DOT_RADIUS_MM, BITS, code)
+    for p in patches:
+        ax.add_patch(p)
+
+    ax.text(
+        cx + DOT_RADIUS_MM * 2.8,
+        cy + DOT_RADIUS_MM * 2.8,
+        str(idx + 1),
+        fontsize=6,
+        ha="right",
+        va="top"
+    )
+
+# Draw calibration reference once per page
+draw_calibration_feature(
+    ax,
+    PAGE_MARGIN_MM,
+    PAGE_MARGIN_MM * 0.8
+)
+
+# ==============================
+# EXPORT (1:1 SCALE)
+# ==============================
+
+plt.savefig(
+    "coded_markers_6mm.pdf",
+    dpi=DPI,
+    transparent=True
+)
+plt.close()
