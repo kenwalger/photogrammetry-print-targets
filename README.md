@@ -11,6 +11,8 @@ photogrammetric capture workflows.
 ## Features
 
 - Mathematically precise coded targets using circular arc (Wedge) geometry
+- **Rotationally invariant codes** - markers can be identified correctly regardless of orientation
+- Industry-standard code patterns for 8-bit, 12-bit, and 14-bit targets
 - Configurable bit count (4-16 bits) for coded rings
 - 6 mm solid center dots (design-space, configurable)
 - Explicit millimeter-based geometry

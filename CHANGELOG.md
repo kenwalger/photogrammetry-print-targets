@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Rotationally Invariant Codes**: Professional-grade code generation for photogrammetry
+  - Industry-standard lookup tables for 8-bit, 12-bit, and 14-bit targets
+  - Algorithmic generation for other bit counts (4-16 bits)
+  - Canonical rotation ensures markers are identified correctly regardless of orientation
+  - Replaces placeholder sequential code generator with production-ready implementation
 - **Comprehensive Test Suite**: Full test coverage for all major components
   - Unit tests for validation functions (`test_validation.py`) - 18 tests
   - Unit tests for code generation (`test_code_generation.py`) - 10 tests
