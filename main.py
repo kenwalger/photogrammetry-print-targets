@@ -212,7 +212,13 @@ def is_rotationally_invariant(code: int, bits: int) -> bool:
 # Based on patterns used in professional photogrammetry software
 
 # Generate rotationally invariant codes for lookup tables
-# These are computed to ensure all codes are in canonical form
+# These are computed lazily to avoid import-time delays
+# All codes are verified to be rotationally invariant
+
+# Cache for generated codes (lazy initialization)
+_STANDARD_CODES_CACHE: dict[int, List[int]] = {}
+
+
 def _generate_standard_codes_8bit() -> List[int]:
     """Generate 8-bit rotationally invariant codes."""
     codes = []
@@ -222,6 +228,7 @@ def _generate_standard_codes_8bit() -> List[int]:
             if len(codes) >= 30:
                 break
     return codes
+
 
 def _generate_standard_codes_12bit() -> List[int]:
     """Generate 12-bit rotationally invariant codes."""
@@ -233,6 +240,7 @@ def _generate_standard_codes_12bit() -> List[int]:
                 break
     return codes
 
+
 def _generate_standard_codes_14bit() -> List[int]:
     """Generate 14-bit rotationally invariant codes."""
     codes = []
@@ -243,14 +251,32 @@ def _generate_standard_codes_14bit() -> List[int]:
                 break
     return codes
 
-# Industry-standard rotationally invariant codes
-# These are canonical codes that work well for photogrammetry
-# All codes are verified to be rotationally invariant
-INDUSTRY_STANDARD_CODES = {
-    8: _generate_standard_codes_8bit(),
-    12: _generate_standard_codes_12bit(),
-    14: _generate_standard_codes_14bit(),
-}
+
+def _get_industry_standard_codes(bits: int) -> List[int]:
+    """
+    Get industry-standard rotationally invariant codes for a given bit count.
+    
+    Uses lazy initialization to avoid import-time performance delays.
+    Codes are generated on first access and cached for subsequent calls.
+    
+    Args:
+        bits: Number of bits (8, 12, or 14).
+        
+    Returns:
+        List of rotationally invariant codes.
+    """
+    if bits not in _STANDARD_CODES_CACHE:
+        if bits == 8:
+            _STANDARD_CODES_CACHE[8] = _generate_standard_codes_8bit()
+        elif bits == 12:
+            _STANDARD_CODES_CACHE[12] = _generate_standard_codes_12bit()
+        elif bits == 14:
+            _STANDARD_CODES_CACHE[14] = _generate_standard_codes_14bit()
+        else:
+            # Not a standard bit count, return empty list
+            return []
+    
+    return _STANDARD_CODES_CACHE[bits]
 
 
 def generate_rotationally_invariant_codes(bits: int, n: int) -> List[int]:
@@ -301,10 +327,11 @@ def get_ring_codes(bits: int, n: int) -> List[int]:
         A list of integer codes suitable for binary ring encoding.
         All codes are rotationally invariant (canonical form).
     """
-    # Use industry-standard lookup table if available
-    if bits in INDUSTRY_STANDARD_CODES:
-        standard_codes = INDUSTRY_STANDARD_CODES[bits]
-        return standard_codes[:min(n, len(standard_codes))]
+    # Use industry-standard lookup table if available (lazy initialization)
+    if bits in (8, 12, 14):
+        standard_codes = _get_industry_standard_codes(bits)
+        if standard_codes:
+            return standard_codes[:min(n, len(standard_codes))]
     
     # For other bit counts, generate rotationally invariant codes algorithmically
     return generate_rotationally_invariant_codes(bits, n)
