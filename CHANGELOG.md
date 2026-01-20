@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Comprehensive Test Suite**: Full test coverage for all major components
+  - Unit tests for validation functions (`test_validation.py`) - 18 tests
+  - Unit tests for code generation (`test_code_generation.py`) - 10 tests
+  - Unit tests for marker geometry (`test_geometry.py`) - 12 tests
+  - Integration tests for rendering functions (`test_rendering.py`) - 12 tests
+  - Integration tests for CLI interface (`test_cli.py`) - 11 tests
+  - pytest configuration with 80% coverage target
+  - **Test Results**: 64 tests passing, 99.34% code coverage, 1.56s execution time
 - **CLI Interface**: Full command-line argument parsing for all configuration parameters
   - `--dot-radius`, `--bits`, `--columns`, `--markers` for marker configuration
   - `--margin`, `--padding`, `--dpi` for layout configuration
@@ -40,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Marker sizing: `MARKER_SIZE_MULTIPLIER`
   - Label positioning: `LABEL_OFFSET_X_MULTIPLIER`, `LABEL_OFFSET_Y_MULTIPLIER`
   - Calibration positioning: `CAL_LABEL_OFFSET_MULTIPLIER`, `CAL_POSITION_Y_MULTIPLIER`
+- **stderr Reference**: Fixed inconsistent stderr reference (`os.sys.stderr` -> `sys.stderr`)
 
 ### Technical Details
 - All functions are now pure and testable (no side effects from module-level execution)

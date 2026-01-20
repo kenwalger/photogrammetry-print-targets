@@ -3,3 +3,9 @@ commit-message.txt
 .idea/
 __pycache__/
 targets/
+.pytest_cache/
+.coverage
+htmlcov/
+*.pyc
+*.pyo
+*.pyd
