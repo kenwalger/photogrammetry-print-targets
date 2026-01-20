@@ -2,3 +2,4 @@ commit-message.txt
 .venv/
 .idea/
 __pycache__/
+targets/

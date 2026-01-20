@@ -1,38 +1,149 @@
+"""
+Photogrammetric Coded Target Generator
+
+Generates printable photogrammetry targets with built-in calibration references.
+Outputs both a combined PDF and individual SVG files for each target.
+
+NOTE: Print at 100% scale / Actual Size.
+      Disable all driver scaling and borderless expansion.
+"""
+
+import argparse
 import math
 import os
-from typing import List
+import sys
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.patches import Wedge, Circle
 
-# NOTE:
-# Print at 100% scale / Actual Size.
-# Disable all driver scaling and borderless expansion.
-
 # ==============================
-# CONFIGURATION (ARCHIVAL SAFE)
+# GEOMETRIC CONSTANTS
 # ==============================
 
-DOT_RADIUS_MM: float = 3.0        # 6 mm diameter center dot
-BITS: int = 8                     # number of ring bits
-COLUMNS: int = 4                  # markers per row
-MARKERS_TOTAL: int = 12           # total markers to generate
-DPI: int = 300                    # print resolution (does not affect scale)
-PAGE_MARGIN_MM: float = 10.0      # white margin for printing
-MARKER_PADDING_MM: float = 5.0    # 5mm gap between markers
+# Ring geometry multipliers (relative to dot radius)
+RING_INNER_MULTIPLIER: float = 1.6  # Inner ring radius = dot_radius * 1.6
+RING_OUTER_MULTIPLIER: float = 2.4  # Outer ring radius = dot_radius * 2.4
+
+# Marker size calculation
+MARKER_SIZE_MULTIPLIER: float = 6.0  # Total marker size = dot_radius * 6
+
+# Label positioning (relative to dot radius)
+LABEL_OFFSET_X_MULTIPLIER: float = 2.8  # Label X offset = dot_radius * 2.8
+LABEL_OFFSET_Y_MULTIPLIER: float = 2.8  # Label Y offset = dot_radius * 2.8
+
+# Calibration feature positioning
+CAL_LABEL_OFFSET_MULTIPLIER: float = 2.5  # Label Y offset = cal_dot_radius * 2.5
+CAL_POSITION_Y_MULTIPLIER: float = 0.8  # Calibration Y position = margin * 0.8
+
+# Font sizes
+LABEL_FONTSIZE: int = 6
+CAL_LABEL_FONTSIZE: int = 6
 
 # ==============================
-# CALIBRATION FEATURE
+# DEFAULT CONFIGURATION
 # ==============================
 
-CAL_DOT_RADIUS_MM: float = 2.0
-CAL_DOT_SPACING_MM: float = 20.0
-CAL_LABEL: str = "20.00 mm calibration reference"
+DEFAULT_DOT_RADIUS_MM: float = 3.0  # 6 mm diameter center dot
+DEFAULT_BITS: int = 8  # number of ring bits
+DEFAULT_COLUMNS: int = 4  # markers per row
+DEFAULT_MARKERS_TOTAL: int = 12  # total markers to generate
+DEFAULT_DPI: int = 300  # print resolution (does not affect scale)
+DEFAULT_PAGE_MARGIN_MM: float = 10.0  # white margin for printing
+DEFAULT_MARKER_PADDING_MM: float = 5.0  # gap between markers
+
+# Calibration feature defaults
+DEFAULT_CAL_DOT_RADIUS_MM: float = 2.0
+DEFAULT_CAL_DOT_SPACING_MM: float = 20.0
+DEFAULT_CAL_LABEL: str = "20.00 mm calibration reference"
+
+# Output defaults
+DEFAULT_OUTPUT_PDF: str = "coded_markers_6mm.pdf"
+DEFAULT_OUTPUT_DIR: str = "targets"
 
 # ==============================
-# CODE GENERATION (PLACEHOLDER)
+# VALIDATION
 # ==============================
+
+
+def validate_config(
+    dot_radius: float,
+    bits: int,
+    columns: int,
+    markers_total: int,
+    page_margin: float,
+    marker_padding: float,
+    cal_dot_spacing: float
+) -> Tuple[bool, str]:
+    """
+    Validate configuration parameters.
+
+    Args:
+        dot_radius: Radius of center dot in mm.
+        bits: Number of ring bits.
+        columns: Number of markers per row.
+        markers_total: Total number of markers.
+        page_margin: Page margin in mm.
+        marker_padding: Padding between markers in mm.
+        cal_dot_spacing: Calibration dot spacing in mm.
+
+    Returns:
+        Tuple of (is_valid, error_message).
+    """
+    if dot_radius <= 0:
+        return False, "Dot radius must be positive"
+    if bits < 4 or bits > 16:
+        return False, "Bits must be between 4 and 16"
+    if columns < 1:
+        return False, "Columns must be at least 1"
+    if markers_total < 1:
+        return False, "Markers total must be at least 1"
+    if page_margin < 0:
+        return False, "Page margin must be non-negative"
+    if marker_padding < 0:
+        return False, "Marker padding must be non-negative"
+    if cal_dot_spacing <= 0:
+        return False, "Calibration dot spacing must be positive"
+
+    max_code = 2 ** bits
+    if markers_total >= max_code:
+        return False, f"Markers total ({markers_total}) exceeds maximum codes ({max_code - 1}) for {bits} bits"
+
+    return True, ""
+
+
+def check_marker_overlap(
+    dot_radius: float,
+    marker_padding: float
+) -> Tuple[bool, str]:
+    """
+    Check if markers would overlap given the current configuration.
+
+    Args:
+        dot_radius: Radius of center dot in mm.
+        marker_padding: Padding between markers in mm.
+
+    Returns:
+        Tuple of (no_overlap, warning_message).
+    """
+    marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
+    marker_radius = marker_size / 2
+
+    if marker_padding < marker_radius * 2:
+        return False, (
+            f"Warning: Marker padding ({marker_padding}mm) may be insufficient. "
+            f"Marker radius is {marker_radius:.2f}mm, minimum padding should be "
+            f"{marker_radius * 2:.2f}mm to prevent overlap."
+        )
+
+    return True, ""
+
+
+# ==============================
+# CODE GENERATION
+# ==============================
+
 
 def get_ring_codes(bits: int, n: int) -> List[int]:
     """
@@ -51,9 +162,11 @@ def get_ring_codes(bits: int, n: int) -> List[int]:
     max_code = 2 ** bits
     return list(range(1, min(n + 1, max_code)))
 
+
 # ==============================
 # MARKER GEOMETRY
 # ==============================
+
 
 def get_coded_marker(
     center_x: float,
@@ -94,8 +207,8 @@ def get_coded_marker(
     )
 
     # --- coded ring ---
-    ring_inner = dot_radius * 1.6
-    ring_outer = dot_radius * 2.4
+    ring_inner = dot_radius * RING_INNER_MULTIPLIER
+    ring_outer = dot_radius * RING_OUTER_MULTIPLIER
     angle_step_deg = 360.0 / bits
 
     for i in range(bits):
@@ -117,7 +230,15 @@ def get_coded_marker(
 
     return patches
 
-def draw_calibration_feature(ax: Axes, origin_x: float, origin_y: float) -> None:
+
+def draw_calibration_feature(
+    ax: Axes,
+    origin_x: float,
+    origin_y: float,
+    cal_dot_radius: float,
+    cal_dot_spacing: float,
+    cal_label: str
+) -> None:
     """
     Draw a calibration reference consisting of two dots separated
     by a known center-to-center distance.
@@ -128,17 +249,20 @@ def draw_calibration_feature(ax: Axes, origin_x: float, origin_y: float) -> None
         ax: Matplotlib Axes object to draw on.
         origin_x: X-coordinate of the first calibration dot (mm).
         origin_y: Y-coordinate of the first calibration dot (mm).
+        cal_dot_radius: Radius of calibration dots (mm).
+        cal_dot_spacing: Center-to-center spacing of calibration dots (mm).
+        cal_label: Text label for the calibration feature.
     """
     dot1 = Circle(
         (origin_x, origin_y),
-        radius=CAL_DOT_RADIUS_MM,
+        radius=cal_dot_radius,
         facecolor="black",
         edgecolor="none"
     )
 
     dot2 = Circle(
-        (origin_x + CAL_DOT_SPACING_MM, origin_y),
-        radius=CAL_DOT_RADIUS_MM,
+        (origin_x + cal_dot_spacing, origin_y),
+        radius=cal_dot_radius,
         facecolor="black",
         edgecolor="none"
     )
@@ -147,104 +271,341 @@ def draw_calibration_feature(ax: Axes, origin_x: float, origin_y: float) -> None
     ax.add_patch(dot2)
 
     ax.text(
-        origin_x + CAL_DOT_SPACING_MM / 2,
-        origin_y - CAL_DOT_RADIUS_MM * 2.5,
-        CAL_LABEL,
-        fontsize=6,
+        origin_x + cal_dot_spacing / 2,
+        origin_y - cal_dot_radius * CAL_LABEL_OFFSET_MULTIPLIER,
+        cal_label,
+        fontsize=CAL_LABEL_FONTSIZE,
         ha="center",
         va="top"
     )
 
+
 # ==============================
-# LAYOUT & RENDERING
+# RENDERING
 # ==============================
 
-codes = get_ring_codes(BITS, MARKERS_TOTAL)
-rows = math.ceil(len(codes) / COLUMNS)
 
-MARKER_SIZE_MM = DOT_RADIUS_MM * 6
-MARKER_CELL_SIZE = MARKER_SIZE_MM + MARKER_PADDING_MM
+def render_marker_to_axes(
+    ax: Axes,
+    center_x: float,
+    center_y: float,
+    dot_radius: float,
+    bits: int,
+    code: int,
+    marker_index: int,
+    show_label: bool = True
+) -> None:
+    """
+    Render a single marker to the given axes.
 
-page_width = COLUMNS * MARKER_CELL_SIZE + 2 * PAGE_MARGIN_MM
-page_height = rows * MARKER_CELL_SIZE + 2 * PAGE_MARGIN_MM
-
-fig = plt.figure(
-    figsize=(page_width / 25.4, page_height / 25.4),
-    dpi=DPI
-)
-
-ax = fig.add_axes([0, 0, 1, 1])
-ax.set_xlim(0, page_width)
-ax.set_ylim(0, page_height)
-ax.set_aspect("equal")
-ax.axis("off")
-
-for idx, code in enumerate(codes):
-    col = idx % COLUMNS
-    row = idx // COLUMNS
-
-    cx = PAGE_MARGIN_MM + col * MARKER_CELL_SIZE + MARKER_CELL_SIZE / 2
-    cy = page_height - (
-        PAGE_MARGIN_MM + row * MARKER_CELL_SIZE + MARKER_CELL_SIZE / 2
-    )
-
-    patches = get_coded_marker(cx, cy, DOT_RADIUS_MM, BITS, code)
+    Args:
+        ax: Matplotlib Axes object to draw on.
+        center_x: X-coordinate of marker center (mm).
+        center_y: Y-coordinate of marker center (mm).
+        dot_radius: Radius of center dot (mm).
+        bits: Number of ring bits.
+        code: Marker code value.
+        marker_index: Zero-based index of the marker (for labeling).
+        show_label: Whether to display the marker number label.
+    """
+    patches = get_coded_marker(center_x, center_y, dot_radius, bits, code)
     for p in patches:
         ax.add_patch(p)
 
-    ax.text(
-        cx + DOT_RADIUS_MM * 2.8,
-        cy + DOT_RADIUS_MM * 2.8,
-        str(idx + 1),
-        fontsize=6,
-        ha="right",
-        va="top"
+    if show_label:
+        ax.text(
+            center_x + dot_radius * LABEL_OFFSET_X_MULTIPLIER,
+            center_y + dot_radius * LABEL_OFFSET_Y_MULTIPLIER,
+            str(marker_index + 1),
+            fontsize=LABEL_FONTSIZE,
+            ha="right",
+            va="top"
+        )
+
+
+def generate_combined_pdf(
+    codes: List[int],
+    dot_radius: float,
+    bits: int,
+    columns: int,
+    page_margin: float,
+    marker_padding: float,
+    dpi: int,
+    cal_dot_radius: float,
+    cal_dot_spacing: float,
+    cal_label: str,
+    output_path: str
+) -> None:
+    """
+    Generate a combined PDF with all markers arranged in a grid.
+
+    Args:
+        codes: List of marker codes to generate.
+        dot_radius: Radius of center dot (mm).
+        bits: Number of ring bits.
+        columns: Number of markers per row.
+        page_margin: Page margin (mm).
+        marker_padding: Padding between markers (mm).
+        dpi: Print resolution.
+        cal_dot_radius: Calibration dot radius (mm).
+        cal_dot_spacing: Calibration dot spacing (mm).
+        cal_label: Calibration label text.
+        output_path: Path to output PDF file.
+    """
+    rows = math.ceil(len(codes) / columns)
+    marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
+    marker_cell_size = marker_size + marker_padding
+
+    page_width = columns * marker_cell_size + 2 * page_margin
+    page_height = rows * marker_cell_size + 2 * page_margin
+
+    fig = plt.figure(
+        figsize=(page_width / 25.4, page_height / 25.4),
+        dpi=dpi
     )
 
-# Draw calibration reference once per page
-draw_calibration_feature(
-    ax,
-    PAGE_MARGIN_MM,
-    PAGE_MARGIN_MM * 0.8
-)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, page_width)
+    ax.set_ylim(0, page_height)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    # Render all markers
+    for idx, code in enumerate(codes):
+        col = idx % columns
+        row = idx // columns
+
+        cx = page_margin + col * marker_cell_size + marker_cell_size / 2
+        cy = page_height - (page_margin + row * marker_cell_size + marker_cell_size / 2)
+
+        render_marker_to_axes(ax, cx, cy, dot_radius, bits, code, idx, show_label=True)
+
+    # Draw calibration reference
+    draw_calibration_feature(
+        ax,
+        page_margin,
+        page_margin * CAL_POSITION_Y_MULTIPLIER,
+        cal_dot_radius,
+        cal_dot_spacing,
+        cal_label
+    )
+
+    plt.savefig(output_path, dpi=dpi, transparent=True)
+    plt.close()
+
+
+def generate_individual_svgs(
+    codes: List[int],
+    dot_radius: float,
+    bits: int,
+    output_dir: str
+) -> None:
+    """
+    Generate individual SVG files for each marker.
+
+    Args:
+        codes: List of marker codes to generate.
+        dot_radius: Radius of center dot (mm).
+        bits: Number of ring bits.
+        output_dir: Directory to save SVG files.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
+
+    for idx, code in enumerate(codes):
+        target_fig = plt.figure(figsize=(marker_size / 25.4, marker_size / 25.4))
+        target_ax = target_fig.add_axes([0, 0, 1, 1])
+        target_ax.set_aspect("equal")
+        target_ax.axis("off")
+
+        render_marker_to_axes(
+            target_ax, 0, 0, dot_radius, bits, code, idx, show_label=False
+        )
+
+        target_ax.set_xlim(-marker_size / 2, marker_size / 2)
+        target_ax.set_ylim(-marker_size / 2, marker_size / 2)
+
+        target_fig.savefig(
+            f"{output_dir}/target_{idx + 1}.svg",
+            transparent=True
+        )
+        plt.close(target_fig)
+
 
 # ==============================
-# EXPORT (1:1 SCALE)
+# MAIN
 # ==============================
 
-plt.savefig(
-    "coded_markers_6mm.pdf",
-    dpi=DPI,
-    transparent=True
-)
-plt.close()
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate photogrammetry targets with calibration references.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "--dot-radius",
+        type=float,
+        default=DEFAULT_DOT_RADIUS_MM,
+        help="Radius of center dot in millimeters"
+    )
+
+    parser.add_argument(
+        "--bits",
+        type=int,
+        default=DEFAULT_BITS,
+        help="Number of bits in the coded ring"
+    )
+
+    parser.add_argument(
+        "--columns",
+        type=int,
+        default=DEFAULT_COLUMNS,
+        help="Number of markers per row"
+    )
+
+    parser.add_argument(
+        "--markers",
+        type=int,
+        default=DEFAULT_MARKERS_TOTAL,
+        dest="markers_total",
+        help="Total number of markers to generate"
+    )
+
+    parser.add_argument(
+        "--dpi",
+        type=int,
+        default=DEFAULT_DPI,
+        help="Print resolution (does not affect scale)"
+    )
+
+    parser.add_argument(
+        "--margin",
+        type=float,
+        default=DEFAULT_PAGE_MARGIN_MM,
+        dest="page_margin",
+        help="Page margin in millimeters"
+    )
+
+    parser.add_argument(
+        "--padding",
+        type=float,
+        default=DEFAULT_MARKER_PADDING_MM,
+        dest="marker_padding",
+        help="Padding between markers in millimeters"
+    )
+
+    parser.add_argument(
+        "--cal-dot-radius",
+        type=float,
+        default=DEFAULT_CAL_DOT_RADIUS_MM,
+        help="Calibration dot radius in millimeters"
+    )
+
+    parser.add_argument(
+        "--cal-spacing",
+        type=float,
+        default=DEFAULT_CAL_DOT_SPACING_MM,
+        dest="cal_dot_spacing",
+        help="Calibration dot center-to-center spacing in millimeters"
+    )
+
+    parser.add_argument(
+        "--cal-label",
+        type=str,
+        default=DEFAULT_CAL_LABEL,
+        help="Calibration reference label text"
+    )
+
+    parser.add_argument(
+        "--output-pdf",
+        type=str,
+        default=DEFAULT_OUTPUT_PDF,
+        help="Output PDF filename"
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=DEFAULT_OUTPUT_DIR,
+        help="Output directory for individual SVG files"
+    )
+
+    parser.add_argument(
+        "--skip-svgs",
+        action="store_true",
+        help="Skip generation of individual SVG files"
+    )
+
+    parser.add_argument(
+        "--skip-pdf",
+        action="store_true",
+        help="Skip generation of combined PDF file"
+    )
+
+    return parser.parse_args()
 
 
-# ==============================
-# Create directory if it doesn't exist
-# ==============================
+def main() -> None:
+    """Main entry point."""
+    args = parse_arguments()
 
-output_dir = "targets"
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+    # Validate configuration
+    is_valid, error_msg = validate_config(
+        args.dot_radius,
+        args.bits,
+        args.columns,
+        args.markers_total,
+        args.page_margin,
+        args.marker_padding,
+        args.cal_dot_spacing
+    )
 
-# Inside your loop, save individual SVGs for the "Targets" folder
-for idx, code in enumerate(codes):
-    # (Existing coordinate logic...)
+    if not is_valid:
+        print(f"Error: {error_msg}", file=sys.stderr)
+        sys.exit(1)
 
-    # Create a small temp figure for the individual SVG
-    target_fig = plt.figure(figsize=(MARKER_SIZE_MM / 25.4, MARKER_SIZE_MM / 25.4))
-    target_ax = target_fig.add_axes([0, 0, 1, 1])
-    target_ax.set_aspect("equal")
-    target_ax.axis("off")
+    # Check for potential overlap
+    no_overlap, warning_msg = check_marker_overlap(
+        args.dot_radius,
+        args.marker_padding
+    )
+    if not no_overlap:
+        print(f"Warning: {warning_msg}", file=os.sys.stderr)
 
-    # Add patches to the individual file
-    target_patches = get_coded_marker(0, 0, DOT_RADIUS_MM, BITS, code)
-    for p in target_patches:
-        target_ax.add_patch(p)
+    # Generate codes
+    codes = get_ring_codes(args.bits, args.markers_total)
 
-    target_ax.set_xlim(-MARKER_SIZE_MM / 2, MARKER_SIZE_MM / 2)
-    target_ax.set_ylim(-MARKER_SIZE_MM / 2, MARKER_SIZE_MM / 2)
+    # Generate combined PDF
+    if not args.skip_pdf:
+        generate_combined_pdf(
+            codes,
+            args.dot_radius,
+            args.bits,
+            args.columns,
+            args.page_margin,
+            args.marker_padding,
+            args.dpi,
+            args.cal_dot_radius,
+            args.cal_dot_spacing,
+            args.cal_label,
+            args.output_pdf
+        )
+        print(f"Generated combined PDF: {args.output_pdf}")
 
-    target_fig.savefig(f"{output_dir}/target_{idx + 1}.svg", transparent=True)
-    plt.close(target_fig)
+    # Generate individual SVGs
+    if not args.skip_svgs:
+        generate_individual_svgs(
+            codes,
+            args.dot_radius,
+            args.bits,
+            args.output_dir
+        )
+        print(f"Generated {len(codes)} individual SVG files in: {args.output_dir}/")
+
+
+if __name__ == "__main__":
+    main()
