@@ -574,7 +574,7 @@ def main() -> None:
         args.marker_padding
     )
     if not no_overlap:
-        print(f"Warning: {warning_msg}", file=os.sys.stderr)
+        print(f"Warning: {warning_msg}", file=sys.stderr)
 
     # Generate codes
     codes = get_ring_codes(args.bits, args.markers_total)
