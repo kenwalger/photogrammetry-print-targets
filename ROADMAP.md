@@ -18,6 +18,6 @@
 - [ ] **CI/CD:** Automated testing pipeline.
 
 ## Phase 4: Forensic Integration (V3.0)
+- [x] **Custom Code Logic:** Implement rotationally invariant bit patterns for 8-bit, 12-bit, and 14-bit targets.
 - [ ] **Metrology Logging:** Generate a CSV log alongside the PDF for manual caliper entry.
 - [ ] **Blockchain "Anchor" Prep:** Automated SHA-256 hashing of generated target sets.
-- [ ] **Custom Code Logic:** Implement rotationally invariant bit patterns for 12-bit and 14-bit targets.
