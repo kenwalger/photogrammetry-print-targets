@@ -16,6 +16,7 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Wedge, Circle
 
 # ==============================
@@ -51,7 +52,12 @@ DEFAULT_COLUMNS: int = 4  # markers per row
 DEFAULT_MARKERS_TOTAL: int = 12  # total markers to generate
 DEFAULT_DPI: int = 300  # print resolution (does not affect scale)
 DEFAULT_PAGE_MARGIN_MM: float = 10.0  # white margin for printing
-DEFAULT_MARKER_PADDING_MM: float = 5.0  # gap between markers
+DEFAULT_MARKER_PADDING_MM: float = 7.5  # gap between markers
+
+# Standard page sizes (in millimeters)
+PAGE_SIZE_US_LETTER = (215.9, 279.4)  # Width, Height
+PAGE_SIZE_A4 = (210.0, 297.0)  # Width, Height
+DEFAULT_PAGE_SIZE = PAGE_SIZE_US_LETTER  # Default to US Letter
 
 # Calibration feature defaults
 DEFAULT_CAL_DOT_RADIUS_MM: float = 2.0
@@ -467,7 +473,8 @@ def render_marker_to_axes(
     bits: int,
     code: int,
     marker_index: int,
-    show_label: bool = True
+    show_label: bool = True,
+    start_number: int = 1
 ) -> None:
     """
     Render a single marker to the given axes.
@@ -481,16 +488,18 @@ def render_marker_to_axes(
         code: Marker code value.
         marker_index: Zero-based index of the marker (for labeling).
         show_label: Whether to display the marker number label.
+        start_number: Starting number for marker labels (default: 1).
     """
     patches = get_coded_marker(center_x, center_y, dot_radius, bits, code)
     for p in patches:
         ax.add_patch(p)
 
     if show_label:
+        marker_number = marker_index + start_number
         ax.text(
             center_x + dot_radius * LABEL_OFFSET_X_MULTIPLIER,
             center_y + dot_radius * LABEL_OFFSET_Y_MULTIPLIER,
-            str(marker_index + 1),
+            str(marker_number),
             fontsize=LABEL_FONTSIZE,
             ha="right",
             va="top"
@@ -508,10 +517,13 @@ def generate_combined_pdf(
     cal_dot_radius: float,
     cal_dot_spacing: float,
     cal_label: str,
-    output_path: str
+    output_path: str,
+    page_size: Tuple[float, float] = DEFAULT_PAGE_SIZE,
+    start_number: int = 1
 ) -> None:
     """
     Generate a combined PDF with all markers arranged in a grid.
+    Automatically splits across multiple pages if markers don't fit on one page.
 
     Args:
         codes: List of marker codes to generate.
@@ -524,55 +536,95 @@ def generate_combined_pdf(
         cal_dot_radius: Calibration dot radius (mm).
         cal_dot_spacing: Calibration dot spacing (mm).
         cal_label: Calibration label text.
-        output_path: Path to output PDF file.
+        output_path: Path to output PDF file (multi-page PDF if needed).
+        page_size: Tuple of (width, height) in mm for page size.
+        start_number: Starting number for marker labels (default: 1).
     """
-    rows = math.ceil(len(codes) / columns)
     marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
     marker_cell_size = marker_size + marker_padding
-
-    page_width = columns * marker_cell_size + 2 * page_margin
-    page_height = rows * marker_cell_size + 2 * page_margin
-
-    fig = plt.figure(
-        figsize=(page_width / 25.4, page_height / 25.4),
-        dpi=dpi
-    )
-
-    ax = fig.add_axes([0, 0, 1, 1])
-    ax.set_xlim(0, page_width)
-    ax.set_ylim(0, page_height)
-    ax.set_aspect("equal")
-    ax.axis("off")
-
-    # Render all markers
-    for idx, code in enumerate(codes):
-        col = idx % columns
-        row = idx // columns
-
-        cx = page_margin + col * marker_cell_size + marker_cell_size / 2
-        cy = page_height - (page_margin + row * marker_cell_size + marker_cell_size / 2)
-
-        render_marker_to_axes(ax, cx, cy, dot_radius, bits, code, idx, show_label=True)
-
-    # Draw calibration reference
-    draw_calibration_feature(
-        ax,
-        page_margin,
-        page_margin * CAL_POSITION_Y_MULTIPLIER,
-        cal_dot_radius,
-        cal_dot_spacing,
-        cal_label
-    )
-
-    plt.savefig(output_path, dpi=dpi, transparent=True)
-    plt.close()
+    
+    # Calculate how many markers fit per page
+    available_width = page_size[0] - 2 * page_margin
+    available_height = page_size[1] - 2 * page_margin
+    
+    max_columns = max(1, int(available_width / marker_cell_size))
+    max_rows = max(1, int(available_height / marker_cell_size))
+    
+    # Use the smaller of requested columns or what fits
+    actual_columns = min(columns, max_columns)
+    
+    # Calculate actual rows per page (based on available height)
+    actual_rows_per_page = max_rows
+    
+    # Calculate markers per page
+    markers_per_page = actual_columns * actual_rows_per_page
+    
+    if markers_per_page == 0:
+        raise ValueError(
+            f"Page size too small: cannot fit any markers with current settings. "
+            f"Try reducing --dot-radius, --padding, or --margin, or use a larger page size."
+        )
+    
+    # Split codes across pages
+    total_pages = math.ceil(len(codes) / markers_per_page)
+    
+    # Use PdfPages for multi-page support
+    with PdfPages(output_path) as pdf:
+        for page_num in range(total_pages):
+            start_idx = page_num * markers_per_page
+            end_idx = min(start_idx + markers_per_page, len(codes))
+            page_codes = codes[start_idx:end_idx]
+            
+            if not page_codes:
+                break
+            
+            rows = math.ceil(len(page_codes) / actual_columns)
+            
+            fig = plt.figure(
+                figsize=(page_size[0] / 25.4, page_size[1] / 25.4),
+                dpi=dpi
+            )
+            
+            ax = fig.add_axes([0, 0, 1, 1])
+            ax.set_xlim(0, page_size[0])
+            ax.set_ylim(0, page_size[1])
+            ax.set_aspect("equal")
+            ax.axis("off")
+            
+            # Render markers for this page
+            for local_idx, code in enumerate(page_codes):
+                global_idx = start_idx + local_idx
+                col = local_idx % actual_columns
+                row = local_idx // actual_columns
+                
+                cx = page_margin + col * marker_cell_size + marker_cell_size / 2
+                cy = page_size[1] - (page_margin + row * marker_cell_size + marker_cell_size / 2)
+                
+                render_marker_to_axes(
+                    ax, cx, cy, dot_radius, bits, code, global_idx,
+                    show_label=True, start_number=start_number
+                )
+            
+            # Draw calibration reference on each page
+            draw_calibration_feature(
+                ax,
+                page_margin,
+                page_margin * CAL_POSITION_Y_MULTIPLIER,
+                cal_dot_radius,
+                cal_dot_spacing,
+                cal_label
+            )
+            
+            pdf.savefig(fig, bbox_inches='tight', transparent=True)
+            plt.close(fig)
 
 
 def generate_individual_svgs(
     codes: List[int],
     dot_radius: float,
     bits: int,
-    output_dir: str
+    output_dir: str,
+    start_number: int = 1
 ) -> None:
     """
     Generate individual SVG files for each marker.
@@ -582,6 +634,7 @@ def generate_individual_svgs(
         dot_radius: Radius of center dot (mm).
         bits: Number of ring bits.
         output_dir: Directory to save SVG files.
+        start_number: Starting number for file naming (default: 1).
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -601,8 +654,9 @@ def generate_individual_svgs(
         target_ax.set_xlim(-marker_size / 2, marker_size / 2)
         target_ax.set_ylim(-marker_size / 2, marker_size / 2)
 
+        file_number = idx + start_number
         target_fig.savefig(
-            f"{output_dir}/target_{idx + 1}.svg",
+            f"{output_dir}/target_{file_number}.svg",
             transparent=True
         )
         plt.close(target_fig)
@@ -720,6 +774,23 @@ def parse_arguments() -> argparse.Namespace:
         help="Skip generation of combined PDF file"
     )
 
+    parser.add_argument(
+        "--start-number",
+        type=int,
+        default=1,
+        dest="start_number",
+        help="Starting number for marker labels and file naming (default: 1)"
+    )
+
+    parser.add_argument(
+        "--page-size",
+        type=str,
+        choices=["letter", "a4"],
+        default="letter",
+        dest="page_size",
+        help="Page size: 'letter' (US Letter, 215.9x279.4mm) or 'a4' (210x297mm)"
+    )
+
     return parser.parse_args()
 
 
@@ -753,6 +824,9 @@ def main() -> None:
     # Generate codes
     codes = get_ring_codes(args.bits, args.markers_total)
 
+    # Determine page size
+    page_size = PAGE_SIZE_US_LETTER if args.page_size == "letter" else PAGE_SIZE_A4
+
     # Generate combined PDF
     if not args.skip_pdf:
         generate_combined_pdf(
@@ -766,9 +840,26 @@ def main() -> None:
             args.cal_dot_radius,
             args.cal_dot_spacing,
             args.cal_label,
-            args.output_pdf
+            args.output_pdf,
+            page_size=page_size,
+            start_number=args.start_number
         )
-        print(f"Generated combined PDF: {args.output_pdf}")
+        
+        # Calculate pages generated (same logic as in generate_combined_pdf)
+        marker_size = args.dot_radius * MARKER_SIZE_MULTIPLIER
+        marker_cell_size = marker_size + args.marker_padding
+        available_width = page_size[0] - 2 * args.page_margin
+        available_height = page_size[1] - 2 * args.page_margin
+        max_columns = max(1, int(available_width / marker_cell_size))
+        max_rows = max(1, int(available_height / marker_cell_size))
+        actual_columns = min(args.columns, max_columns)
+        markers_per_page = actual_columns * max_rows
+        total_pages = math.ceil(len(codes) / markers_per_page) if markers_per_page > 0 else 1
+        
+        if total_pages > 1:
+            print(f"Generated {total_pages}-page PDF: {args.output_pdf} ({len(codes)} markers)")
+        else:
+            print(f"Generated combined PDF: {args.output_pdf}")
 
     # Generate individual SVGs
     if not args.skip_svgs:
@@ -776,7 +867,8 @@ def main() -> None:
             codes,
             args.dot_radius,
             args.bits,
-            args.output_dir
+            args.output_dir,
+            start_number=args.start_number
         )
         print(f"Generated {len(codes)} individual SVG files in: {args.output_dir}/")
 
