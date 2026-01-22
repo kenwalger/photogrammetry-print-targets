@@ -13,6 +13,9 @@ photogrammetric capture workflows.
 - Mathematically precise coded targets using circular arc (Wedge) geometry
 - **Rotationally invariant codes** - markers can be identified correctly regardless of orientation
 - Industry-standard code patterns for 8-bit, 12-bit, and 14-bit targets
+- **Multi-page PDF support** - automatically splits large marker sets across multiple pages
+- **Starting number option** - generate markers with custom numbering ranges
+- Configurable page sizes (US Letter or A4)
 - Configurable bit count (4-16 bits) for coded rings
 - 6 mm solid center dots (design-space, configurable)
 - Explicit millimeter-based geometry
@@ -72,6 +75,7 @@ python main.py --help
 - `--bits INT` - Number of bits in the coded ring (default: 8, range: 4-16)
 - `--columns INT` - Number of markers per row (default: 4)
 - `--markers INT` - Total number of markers to generate (default: 12)
+- `--start-number INT` - Starting number for marker labels and file naming (default: 1)
 
 **Layout Configuration:**
 - `--margin FLOAT` - Page margin in millimeters (default: 10.0)
@@ -88,6 +92,7 @@ python main.py --help
 - `--output-dir STRING` - Output directory for individual SVG files (default: "targets")
 - `--skip-svgs` - Skip generation of individual SVG files
 - `--skip-pdf` - Skip generation of combined PDF file
+- `--page-size {letter,a4}` - Page size: 'letter' (US Letter, 215.9x279.4mm) or 'a4' (210x297mm) (default: letter)
 
 ### Example: Custom Configuration
 
@@ -95,6 +100,24 @@ Generate 16 markers with 10-bit coding in a 5-column layout:
 
 ```bash
 python main.py --bits 10 --markers 16 --columns 5 --output-pdf targets_10bit.pdf
+```
+
+Generate 75 markers (automatically splits across multiple pages):
+
+```bash
+python main.py --markers 75 --columns 5
+```
+
+Generate markers starting from number 100:
+
+```bash
+python main.py --markers 20 --start-number 100
+```
+
+Generate markers on A4 paper:
+
+```bash
+python main.py --page-size a4 --markers 50
 ```
 
 Generate only the combined PDF (skip individual SVGs):
