@@ -52,7 +52,7 @@ DEFAULT_COLUMNS: int = 4  # markers per row
 DEFAULT_MARKERS_TOTAL: int = 12  # total markers to generate
 DEFAULT_DPI: int = 300  # print resolution (does not affect scale)
 DEFAULT_PAGE_MARGIN_MM: float = 10.0  # white margin for printing
-DEFAULT_MARKER_PADDING_MM: float = 7.5  # gap between markers
+DEFAULT_MARKER_PADDING_MM: float = 5.0  # gap between markers
 
 # Standard page sizes (in millimeters)
 PAGE_SIZE_US_LETTER = (215.9, 279.4)  # Width, Height
@@ -461,6 +461,46 @@ def draw_calibration_feature(
 
 
 # ==============================
+# PAGE CALCULATION
+# ==============================
+
+
+def calculate_page_capacity(
+    page_size: Tuple[float, float],
+    dot_radius: float,
+    marker_padding: float,
+    page_margin: float,
+    columns: int
+) -> Tuple[int, int, int]:
+    """
+    Calculate how many markers fit on a page and actual layout dimensions.
+    
+    Args:
+        page_size: Tuple of (width, height) in mm.
+        dot_radius: Radius of center dot (mm).
+        marker_padding: Padding between markers (mm).
+        page_margin: Page margin (mm).
+        columns: Requested number of columns.
+    
+    Returns:
+        Tuple of (actual_columns, max_rows, markers_per_page).
+    """
+    marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
+    marker_cell_size = marker_size + marker_padding
+    
+    available_width = page_size[0] - 2 * page_margin
+    available_height = page_size[1] - 2 * page_margin
+    
+    max_columns = max(1, int(available_width / marker_cell_size))
+    max_rows = max(1, int(available_height / marker_cell_size))
+    
+    actual_columns = min(columns, max_columns)
+    markers_per_page = actual_columns * max_rows
+    
+    return actual_columns, max_rows, markers_per_page
+
+
+# ==============================
 # RENDERING
 # ==============================
 
@@ -540,30 +580,19 @@ def generate_combined_pdf(
         page_size: Tuple of (width, height) in mm for page size.
         start_number: Starting number for marker labels (default: 1).
     """
-    marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
-    marker_cell_size = marker_size + marker_padding
-    
-    # Calculate how many markers fit per page
-    available_width = page_size[0] - 2 * page_margin
-    available_height = page_size[1] - 2 * page_margin
-    
-    max_columns = max(1, int(available_width / marker_cell_size))
-    max_rows = max(1, int(available_height / marker_cell_size))
-    
-    # Use the smaller of requested columns or what fits
-    actual_columns = min(columns, max_columns)
-    
-    # Calculate actual rows per page (based on available height)
-    actual_rows_per_page = max_rows
-    
-    # Calculate markers per page
-    markers_per_page = actual_columns * actual_rows_per_page
+    # Calculate page capacity
+    actual_columns, max_rows, markers_per_page = calculate_page_capacity(
+        page_size, dot_radius, marker_padding, page_margin, columns
+    )
     
     if markers_per_page == 0:
         raise ValueError(
             f"Page size too small: cannot fit any markers with current settings. "
             f"Try reducing --dot-radius, --padding, or --margin, or use a larger page size."
         )
+    
+    marker_size = dot_radius * MARKER_SIZE_MULTIPLIER
+    marker_cell_size = marker_size + marker_padding
     
     # Split codes across pages
     total_pages = math.ceil(len(codes) / markers_per_page)
@@ -615,7 +644,7 @@ def generate_combined_pdf(
                 cal_label
             )
             
-            pdf.savefig(fig, bbox_inches='tight', transparent=True)
+            pdf.savefig(fig, transparent=True)
             plt.close(fig)
 
 
@@ -845,15 +874,10 @@ def main() -> None:
             start_number=args.start_number
         )
         
-        # Calculate pages generated (same logic as in generate_combined_pdf)
-        marker_size = args.dot_radius * MARKER_SIZE_MULTIPLIER
-        marker_cell_size = marker_size + args.marker_padding
-        available_width = page_size[0] - 2 * args.page_margin
-        available_height = page_size[1] - 2 * args.page_margin
-        max_columns = max(1, int(available_width / marker_cell_size))
-        max_rows = max(1, int(available_height / marker_cell_size))
-        actual_columns = min(args.columns, max_columns)
-        markers_per_page = actual_columns * max_rows
+        # Calculate pages generated
+        _, _, markers_per_page = calculate_page_capacity(
+            page_size, args.dot_radius, args.marker_padding, args.page_margin, args.columns
+        )
         total_pages = math.ceil(len(codes) / markers_per_page) if markers_per_page > 0 else 1
         
         if total_pages > 1:

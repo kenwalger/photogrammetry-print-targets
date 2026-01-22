@@ -67,9 +67,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Function Signatures**: `draw_calibration_feature()` now accepts calibration parameters as arguments instead of using global constants
 - **Code Structure**: All execution logic moved into `main()` function, making the module importable
 - **Constants Organization**: Grouped constants into logical sections (Geometric, Default Configuration)
-- **Default Padding**: Increased default marker padding from 5.0mm to 7.5mm for better spacing
 
 ### Fixed
+- **PDF Page Dimensions**: Removed `bbox_inches='tight'` parameter from `pdf.savefig()` call
+  - Preserves explicit page size dimensions (US Letter/A4) without unpredictable cropping
+  - Ensures multi-page PDFs maintain consistent page sizes across all pages
+- **Code Duplication**: Eliminated duplicate page capacity calculation logic
+  - Created `calculate_page_capacity()` function to centralize page layout calculations
+  - Both `generate_combined_pdf()` and `main()` now use shared function
+  - Improves maintainability and ensures consistent calculations
 - **Code Duplication**: Eliminated duplicate marker rendering code between PDF and SVG generation
 - **Magic Numbers**: Replaced all hardcoded multipliers and offsets with named constants
   - Ring geometry: `RING_INNER_MULTIPLIER`, `RING_OUTER_MULTIPLIER`
