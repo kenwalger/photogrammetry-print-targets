@@ -86,7 +86,7 @@ class TestMainIntegration:
     """Integration tests for main function."""
 
     def test_main_with_defaults(self):
-        """Test main function with default arguments."""
+        """Test main function with default arguments (AVERY 6450)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch('sys.argv', [
                 'main.py',
@@ -98,7 +98,7 @@ class TestMainIntegration:
                 with patch('sys.stdout', new=StringIO()) as fake_out:
                     main()
                     output = fake_out.getvalue()
-                    assert 'Generated combined PDF' in output
+                    assert 'Generated AVERY 6450 PDF' in output
                     assert 'Generated' in output and 'individual SVG files' in output
 
     def test_main_skip_pdf(self):
@@ -128,7 +128,7 @@ class TestMainIntegration:
                 with patch('sys.stdout', new=StringIO()) as fake_out:
                     main()
                     output = fake_out.getvalue()
-                    assert 'Generated combined PDF' in output
+                    assert 'Generated AVERY 6450 PDF' in output
                     assert 'individual SVG files' not in output
 
     def test_main_validation_error(self):
