@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-Temporary script to analyze AVERY 6450 PDF template and extract layout specifications.
+Development tool to analyze AVERY 6450 PDF template and extract layout specifications.
+
+This script was used to extract the exact label positions and spacing from the
+official AVERY 6450 template PDF. The extracted values are now hardcoded in main.py.
+
+Usage:
+    python tools/analyze_avery_template.py
 """
 
 import sys
@@ -222,5 +228,9 @@ def analyze_pdf_template(pdf_path: str) -> None:
         return None, None
 
 if __name__ == "__main__":
-    pdf_path = "Avery6450_Templates/Avery6450RoundLabels.pdf"
+    # Path relative to project root
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    pdf_path = os.path.join(project_root, "Avery6450_Templates", "Avery6450RoundLabels.pdf")
     analyze_pdf_template(pdf_path)

@@ -10,4 +10,9 @@ htmlcov/
 *.pyo
 *.pyd
 
+# Test artifacts and generated PDFs
+*.pdf
+# Note: Avery6450_Templates/ directory is ignored below, but template PDFs
+# are already tracked in git, so they will remain tracked
+
 Avery6450_Templates/
