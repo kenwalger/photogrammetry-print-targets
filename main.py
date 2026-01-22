@@ -57,7 +57,34 @@ DEFAULT_MARKER_PADDING_MM: float = 5.0  # gap between markers
 # Standard page sizes (in millimeters)
 PAGE_SIZE_US_LETTER = (215.9, 279.4)  # Width, Height
 PAGE_SIZE_A4 = (210.0, 297.0)  # Width, Height
-DEFAULT_PAGE_SIZE = PAGE_SIZE_US_LETTER  # Default to US Letter
+
+# AVERY 6450 label sheet specifications
+# 1" (25.4mm) round labels, 7 columns x 9 rows = 63 labels per sheet
+# Based on standard AVERY 6450 template specifications
+AVERY_6450_LABEL_DIAMETER_MM: float = 25.4  # 1 inch diameter
+AVERY_6450_COLUMNS: int = 7
+AVERY_6450_ROWS: int = 9
+AVERY_6450_LABELS_PER_SHEET: int = AVERY_6450_COLUMNS * AVERY_6450_ROWS  # 63
+
+# AVERY 6450 label grid spacing (center-to-center distances in mm)
+# Extracted from template analysis: first label center at (25.40, 266.70) mm
+# For 7 columns on 215.9mm width: spacing = (215.9 - 2*left_margin) / 6
+# For 9 rows on 279.4mm height: spacing = (279.4 - top_margin - bottom_margin) / 8
+# Using template-extracted values and calculating spacing
+AVERY_6450_LEFT_MARGIN_MM: float = 25.40   # Left margin to first column center (from template)
+AVERY_6450_TOP_MARGIN_MM: float = 12.70    # Top margin to first row center (279.4 - 266.70 from template)
+
+# Calculate spacing based on page dimensions and margins
+# For 7 columns: spacing = (215.9 - 2*25.40) / 6 = 27.52mm
+# For 9 rows: spacing = (279.4 - 2*12.70) / 8 = 31.75mm (assuming symmetric top/bottom margins)
+AVERY_6450_HORIZONTAL_SPACING_MM: float = 27.52  # Horizontal center-to-center spacing
+AVERY_6450_VERTICAL_SPACING_MM: float = 31.75   # Vertical center-to-center spacing
+
+# AVERY 6450 uses US Letter page size
+PAGE_SIZE_AVERY_6450 = PAGE_SIZE_US_LETTER  # Same as US Letter (215.9 x 279.4 mm)
+
+# Default to AVERY 6450 for usability
+DEFAULT_PAGE_SIZE = PAGE_SIZE_AVERY_6450
 
 # Calibration feature defaults
 DEFAULT_CAL_DOT_RADIUS_MM: float = 2.0
@@ -461,6 +488,106 @@ def draw_calibration_feature(
 
 
 # ==============================
+# AVERY 6450 LAYOUT
+# ==============================
+
+
+def get_avery_6450_label_positions() -> List[Tuple[float, float]]:
+    """
+    Get the exact label center positions for AVERY 6450 label sheet.
+    
+    Returns:
+        List of (x, y) tuples in millimeters, representing label center positions.
+        Positions are ordered left-to-right, top-to-bottom (row by row).
+    """
+    positions = []
+    for row in range(AVERY_6450_ROWS):
+        y_from_top = AVERY_6450_TOP_MARGIN_MM + row * AVERY_6450_VERTICAL_SPACING_MM
+        y_from_bottom = PAGE_SIZE_AVERY_6450[1] - y_from_top
+        for col in range(AVERY_6450_COLUMNS):
+            x = AVERY_6450_LEFT_MARGIN_MM + col * AVERY_6450_HORIZONTAL_SPACING_MM
+            positions.append((x, y_from_bottom))
+    return positions
+
+
+def generate_avery_6450_pdf(
+    codes: List[int],
+    dot_radius: float,
+    bits: int,
+    dpi: int,
+    cal_dot_radius: float,
+    cal_dot_spacing: float,
+    cal_label: str,
+    output_path: str,
+    start_number: int = 1
+) -> None:
+    """
+    Generate PDF with markers positioned at exact AVERY 6450 label centers.
+    
+    Args:
+        codes: List of marker codes to generate.
+        dot_radius: Radius of center dot (mm).
+        bits: Number of ring bits.
+        dpi: Print resolution.
+        cal_dot_radius: Calibration dot radius (mm).
+        cal_dot_spacing: Calibration dot spacing (mm).
+        cal_label: Calibration label text.
+        output_path: Path to output PDF file.
+        start_number: Starting number for marker labels (default: 1).
+    """
+    label_positions = get_avery_6450_label_positions()
+    
+    # Calculate how many pages needed
+    total_pages = math.ceil(len(codes) / AVERY_6450_LABELS_PER_SHEET)
+    
+    with PdfPages(output_path) as pdf:
+        for page_num in range(total_pages):
+            start_idx = page_num * AVERY_6450_LABELS_PER_SHEET
+            end_idx = min(start_idx + AVERY_6450_LABELS_PER_SHEET, len(codes))
+            page_codes = codes[start_idx:end_idx]
+            
+            if not page_codes:
+                break
+            
+            fig = plt.figure(
+                figsize=(PAGE_SIZE_AVERY_6450[0] / 25.4, PAGE_SIZE_AVERY_6450[1] / 25.4),
+                dpi=dpi
+            )
+            
+            ax = fig.add_axes([0, 0, 1, 1])
+            ax.set_xlim(0, PAGE_SIZE_AVERY_6450[0])
+            ax.set_ylim(0, PAGE_SIZE_AVERY_6450[1])
+            ax.set_aspect("equal")
+            ax.axis("off")
+            
+            # Render markers at exact AVERY 6450 label positions
+            for local_idx, code in enumerate(page_codes):
+                if local_idx >= len(label_positions):
+                    break
+                    
+                global_idx = start_idx + local_idx
+                label_x, label_y = label_positions[local_idx]
+                
+                render_marker_to_axes(
+                    ax, label_x, label_y, dot_radius, bits, code, global_idx,
+                    show_label=True, start_number=start_number
+                )
+            
+            # Draw calibration reference on each page
+            draw_calibration_feature(
+                ax,
+                AVERY_6450_LEFT_MARGIN_MM,
+                PAGE_SIZE_AVERY_6450[1] - AVERY_6450_TOP_MARGIN_MM - AVERY_6450_VERTICAL_SPACING_MM * (AVERY_6450_ROWS - 0.5),
+                cal_dot_radius,
+                cal_dot_spacing,
+                cal_label
+            )
+            
+            pdf.savefig(fig, transparent=True)
+            plt.close(fig)
+
+
+# ==============================
 # PAGE CALCULATION
 # ==============================
 
@@ -814,10 +941,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--page-size",
         type=str,
-        choices=["letter", "a4"],
-        default="letter",
+        choices=["letter", "a4", "avery6450"],
+        default="avery6450",
         dest="page_size",
-        help="Page size: 'letter' (US Letter, 215.9x279.4mm) or 'a4' (210x297mm)"
+        help="Page size: 'letter' (US Letter), 'a4' (A4), or 'avery6450' (AVERY 6450 label sheet, default)"
     )
 
     return parser.parse_args()
@@ -853,37 +980,62 @@ def main() -> None:
     # Generate codes
     codes = get_ring_codes(args.bits, args.markers_total)
 
-    # Determine page size
-    page_size = PAGE_SIZE_US_LETTER if args.page_size == "letter" else PAGE_SIZE_A4
-
     # Generate combined PDF
     if not args.skip_pdf:
-        generate_combined_pdf(
-            codes,
-            args.dot_radius,
-            args.bits,
-            args.columns,
-            args.page_margin,
-            args.marker_padding,
-            args.dpi,
-            args.cal_dot_radius,
-            args.cal_dot_spacing,
-            args.cal_label,
-            args.output_pdf,
-            page_size=page_size,
-            start_number=args.start_number
-        )
-        
-        # Calculate pages generated
-        _, _, markers_per_page = calculate_page_capacity(
-            page_size, args.dot_radius, args.marker_padding, args.page_margin, args.columns
-        )
-        total_pages = math.ceil(len(codes) / markers_per_page) if markers_per_page > 0 else 1
-        
-        if total_pages > 1:
-            print(f"Generated {total_pages}-page PDF: {args.output_pdf} ({len(codes)} markers)")
+        # Use AVERY 6450 layout if specified (default)
+        if args.page_size == "avery6450":
+            generate_avery_6450_pdf(
+                codes,
+                args.dot_radius,
+                args.bits,
+                args.dpi,
+                args.cal_dot_radius,
+                args.cal_dot_spacing,
+                args.cal_label,
+                args.output_pdf,
+                start_number=args.start_number
+            )
+            
+            # Calculate pages generated
+            total_pages = math.ceil(len(codes) / AVERY_6450_LABELS_PER_SHEET)
+            if total_pages > 1:
+                print(f"Generated {total_pages}-page AVERY 6450 PDF: {args.output_pdf} ({len(codes)} markers)")
+            else:
+                print(f"Generated AVERY 6450 PDF: {args.output_pdf}")
         else:
-            print(f"Generated combined PDF: {args.output_pdf}")
+            # Use standard page layout
+            page_size = PAGE_SIZE_US_LETTER if args.page_size == "letter" else PAGE_SIZE_A4
+            generate_combined_pdf(
+                codes,
+                args.dot_radius,
+                args.bits,
+                args.columns,
+                args.page_margin,
+                args.marker_padding,
+                args.dpi,
+                args.cal_dot_radius,
+                args.cal_dot_spacing,
+                args.cal_label,
+                args.output_pdf,
+                page_size=page_size,
+                start_number=args.start_number
+            )
+            
+            # Calculate pages generated (same logic as in generate_combined_pdf)
+            marker_size = args.dot_radius * MARKER_SIZE_MULTIPLIER
+            marker_cell_size = marker_size + args.marker_padding
+            available_width = page_size[0] - 2 * args.page_margin
+            available_height = page_size[1] - 2 * args.page_margin
+            max_columns = max(1, int(available_width / marker_cell_size))
+            max_rows = max(1, int(available_height / marker_cell_size))
+            actual_columns = min(args.columns, max_columns)
+            markers_per_page = actual_columns * max_rows
+            total_pages = math.ceil(len(codes) / markers_per_page) if markers_per_page > 0 else 1
+            
+            if total_pages > 1:
+                print(f"Generated {total_pages}-page PDF: {args.output_pdf} ({len(codes)} markers)")
+            else:
+                print(f"Generated combined PDF: {args.output_pdf}")
 
     # Generate individual SVGs
     if not args.skip_svgs:

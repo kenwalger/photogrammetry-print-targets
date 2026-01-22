@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AVERY 6450 Label Sheet Support**: Native support for AVERY 6450 round label sheets
+  - 7 columns × 9 rows = 63 labels per sheet layout
+  - Markers positioned at exact label center coordinates
+  - Extracted layout specifications from official AVERY template
+  - Set as default output format for improved usability
+  - Automatic multi-page support for large marker sets
 - **Multi-Page PDF Support**: Automatic pagination for large marker sets
   - Automatically splits markers across multiple pages when they don't fit on one page
   - Uses standard page sizes (US Letter or A4) with automatic layout calculation
@@ -18,9 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Useful for generating different ranges (e.g., markers 100-120)
   - Applies to both PDF labels and SVG file naming
 - **Page Size Selection**: Configurable page sizes
-  - `--page-size {letter,a4}` option for US Letter (215.9x279.4mm) or A4 (210x297mm)
+  - `--page-size {letter,a4,avery6450}` option for US Letter (215.9x279.4mm), A4 (210x297mm), or AVERY 6450 label sheets
   - Automatically calculates how many markers fit per page
-  - Defaults to US Letter for compatibility
+  - Defaults to AVERY 6450 for improved usability
 - **Rotationally Invariant Codes**: Professional-grade code generation for photogrammetry
   - Industry-standard lookup tables for 8-bit, 12-bit, and 14-bit targets (lazy initialization)
   - Algorithmic generation for other bit counts (4-16 bits)
@@ -39,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--dot-radius`, `--bits`, `--columns`, `--markers` for marker configuration
   - `--start-number` for custom marker numbering ranges
   - `--margin`, `--padding`, `--dpi` for layout configuration
-  - `--page-size {letter,a4}` for page size selection
+  - `--page-size {letter,a4,avery6450}` for page size selection (default: avery6450)
   - `--cal-dot-radius`, `--cal-spacing`, `--cal-label` for calibration feature
   - `--output-pdf`, `--output-dir` for output configuration
   - `--skip-svgs`, `--skip-pdf` for selective output generation
@@ -58,15 +64,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added CHANGELOG.md for change tracking
 
 ### Changed
+- **Default Output Format**: Changed default page size from US Letter to AVERY 6450 label sheets
+  - Improves usability for production workflows using standard label sheets
+  - Can still use `--page-size letter` or `--page-size a4` for custom layouts
 - **PDF Generation**: `generate_combined_pdf()` now supports multi-page output using `PdfPages`
   - Automatically calculates page capacity based on page size and marker dimensions
   - Splits markers across pages when they exceed single-page capacity
   - Each page maintains proper layout with calibration reference
+- **New Function**: Added `generate_avery_6450_pdf()` for AVERY 6450-specific layout
+  - Positions markers at exact label center coordinates
+  - Handles 63 labels per sheet (7×9 grid)
+  - Automatic multi-page support
 - **Marker Rendering**: `render_marker_to_axes()` now accepts `start_number` parameter for custom numbering
 - **SVG Generation**: `generate_individual_svgs()` now accepts `start_number` parameter for file naming
 - **Function Signatures**: `draw_calibration_feature()` now accepts calibration parameters as arguments instead of using global constants
 - **Code Structure**: All execution logic moved into `main()` function, making the module importable
-- **Constants Organization**: Grouped constants into logical sections (Geometric, Default Configuration)
+- **Constants Organization**: Grouped constants into logical sections (Geometric, Default Configuration, AVERY 6450 specifications)
 
 ### Fixed
 - **PDF Page Dimensions**: Removed `bbox_inches='tight'` parameter from `pdf.savefig()` call
