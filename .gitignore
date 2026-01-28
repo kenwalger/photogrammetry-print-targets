@@ -10,6 +10,13 @@ htmlcov/
 *.pyo
 *.pyd
 
+# macOS metadata files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
 # Test artifacts and generated PDFs
 *.pdf
 # Note: Avery6450_Templates/ directory is ignored below, but template PDFs
