@@ -13,7 +13,7 @@ photogrammetric capture workflows.
 - Mathematically precise coded targets using circular arc (Wedge) geometry
 - **Rotationally invariant codes** - markers can be identified correctly regardless of orientation
 - Industry-standard code patterns for 8-bit, 12-bit, and 14-bit targets
-- **AVERY 6450 label sheet support** - native support for AVERY 6450 round labels (7×9 grid, 63 labels per sheet)
+- **AVERY 6450 label sheet support** - native support for AVERY 6450 round labels (7×9 grid, 63 labels per sheet) with precise alignment based on physical sheet measurements
 - **Multi-page PDF support** - automatically splits large marker sets across multiple pages
 - **Starting number option** - generate markers with custom numbering ranges
 - Configurable page sizes (AVERY 6450 default, US Letter, or A4)
@@ -128,6 +128,12 @@ Generate markers for AVERY 6450 label sheets (default):
 ```bash
 python main.py --markers 63
 ```
+
+**AVERY 6450 Alignment**: The layout is precisely calibrated based on physical sheet measurements:
+- Left margin: 25.00mm, Top margin: 11.70mm
+- Horizontal spacing: 27.45mm, Vertical spacing: 28.65mm
+- 15.0mm vertical offset applied for optimal alignment
+- Calibration reference removed (not needed for label sheet workflow)
 
 Generate markers for custom layout (US Letter with custom columns):
 

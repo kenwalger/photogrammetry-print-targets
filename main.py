@@ -60,25 +60,18 @@ PAGE_SIZE_A4 = (210.0, 297.0)  # Width, Height
 
 # AVERY 6450 label sheet specifications
 # 1" (25.4mm) round labels, 7 columns x 9 rows = 63 labels per sheet
-# Based on standard AVERY 6450 template specifications
+# Values measured from physical AVERY 6450 label sheet
 AVERY_6450_LABEL_DIAMETER_MM: float = 25.4  # 1 inch diameter
 AVERY_6450_COLUMNS: int = 7
 AVERY_6450_ROWS: int = 9
 AVERY_6450_LABELS_PER_SHEET: int = AVERY_6450_COLUMNS * AVERY_6450_ROWS  # 63
 
 # AVERY 6450 label grid spacing (center-to-center distances in mm)
-# Extracted from template analysis: first label center at (25.40, 266.70) mm
-# For 7 columns on 215.9mm width: spacing = (215.9 - 2*left_margin) / 6
-# For 9 rows on 279.4mm height: spacing = (279.4 - top_margin - bottom_margin) / 8
-# Using template-extracted values and calculating spacing
-AVERY_6450_LEFT_MARGIN_MM: float = 25.40   # Left margin to first column center (from template)
-AVERY_6450_TOP_MARGIN_MM: float = 12.70    # Top margin to first row center (279.4 - 266.70 from template)
-
-# Calculate spacing based on page dimensions and margins
-# For 7 columns: spacing = (215.9 - 2*25.40) / 6 = 27.52mm
-# For 9 rows: spacing = (279.4 - 2*12.70) / 8 = 31.75mm (assuming symmetric top/bottom margins)
-AVERY_6450_HORIZONTAL_SPACING_MM: float = 27.52  # Horizontal center-to-center spacing
-AVERY_6450_VERTICAL_SPACING_MM: float = 31.75   # Vertical center-to-center spacing
+# Measured from physical label sheet (margins to edge of physical sheet)
+AVERY_6450_LEFT_MARGIN_MM: float = 25.00   # Left margin to first column center (measured)
+AVERY_6450_TOP_MARGIN_MM: float = 11.70    # Top margin to first row center (measured)
+AVERY_6450_HORIZONTAL_SPACING_MM: float = 27.45  # Horizontal center-to-center spacing (measured)
+AVERY_6450_VERTICAL_SPACING_MM: float = 28.65   # Vertical center-to-center spacing (measured)
 
 # AVERY 6450 uses US Letter page size
 PAGE_SIZE_AVERY_6450 = PAGE_SIZE_US_LETTER  # Same as US Letter (215.9 x 279.4 mm)
@@ -499,11 +492,16 @@ def get_avery_6450_label_positions() -> List[Tuple[float, float]]:
     Returns:
         List of (x, y) tuples in millimeters, representing label center positions.
         Positions are ordered left-to-right, top-to-bottom (row by row).
+        All positions are shifted down by 13.5mm for optimal alignment with physical label sheets.
     """
+    # Vertical offset to improve alignment with physical label sheet
+    # Fine-tuned to 13.5mm based on physical testing (15.0mm was close, 13.5mm is optimal)
+    VERTICAL_OFFSET_MM: float = 13.5
+    
     positions = []
     for row in range(AVERY_6450_ROWS):
         y_from_top = AVERY_6450_TOP_MARGIN_MM + row * AVERY_6450_VERTICAL_SPACING_MM
-        y_from_bottom = PAGE_SIZE_AVERY_6450[1] - y_from_top
+        y_from_bottom = PAGE_SIZE_AVERY_6450[1] - y_from_top - VERTICAL_OFFSET_MM
         for col in range(AVERY_6450_COLUMNS):
             x = AVERY_6450_LEFT_MARGIN_MM + col * AVERY_6450_HORIZONTAL_SPACING_MM
             positions.append((x, y_from_bottom))
@@ -573,15 +571,7 @@ def generate_avery_6450_pdf(
                     show_label=True, start_number=start_number
                 )
             
-            # Draw calibration reference on each page
-            draw_calibration_feature(
-                ax,
-                AVERY_6450_LEFT_MARGIN_MM,
-                PAGE_SIZE_AVERY_6450[1] - AVERY_6450_TOP_MARGIN_MM - AVERY_6450_VERTICAL_SPACING_MM * (AVERY_6450_ROWS - 0.5),
-                cal_dot_radius,
-                cal_dot_spacing,
-                cal_label
-            )
+            # Calibration reference removed for AVERY 6450 layout
             
             pdf.savefig(fig, transparent=True)
             plt.close(fig)
