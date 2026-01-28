@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **AVERY 6450 Alignment**: Fine-tuned label positions based on physical sheet measurements
+  - Updated margins: Left 25.00mm, Top 11.70mm (measured from physical sheet)
+  - Updated spacing: Horizontal 27.45mm, Vertical 28.65mm (measured from physical sheet)
+  - Applied 15.0mm vertical offset for optimal alignment
+  - Removed calibration reference from AVERY 6450 output (not needed for label sheet workflow)
+
 ### Added
 - **AVERY 6450 Label Sheet Support**: Native support for AVERY 6450 round label sheets
   - 7 columns × 9 rows = 63 labels per sheet layout
